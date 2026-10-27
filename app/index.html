@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>아기 앨범</title>
+<meta name="description" content="아기가 웃고, 손 흔들고, 소리 내면 앨범 속 엄마 영상이 반응해요.">
+<meta name="theme-color" content="#23706B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="아기 앨범">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Jua&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main class="wrap" id="home">
+  <header class="top">
+    <h1 class="brand">아기 앨범</h1>
+    <p class="sub">아기가 웃고, 손 흔들고, 소리 내면 엄마 영상이 반응해요</p>
+  </header>
+
+  <div id="storeWarn" class="warn" hidden>이 브라우저에서는 영상을 저장할 수 없어서, 창을 닫으면 앨범이 비워져요. 비공개 창이 아닌 일반 창에서 열어 주세요.</div>
+
+  <section class="startbar">
+    <button id="start" class="btn big primary" type="button">엄마랑 놀기 시작</button>
+    <p id="startMeta">앨범에서 엄마나 가족이 나오는 영상을 골라 주세요.</p>
+  </section>
+
+  <section class="col">
+    <div class="row-head">
+      <h2>놀이에 쓸 영상</h2>
+      <label class="btn sm" for="pick">+ 영상 고르기</label>
+      <input type="file" id="pick" class="vh" accept="video/*" multiple>
+    </div>
+
+    <div id="empty" class="empty">
+      <h3>이렇게 놀아요</h3>
+      <ul class="how">
+        <li><span class="ic">🎞️</span><div><b>영상만 골라 주세요.</b> 엄마가 웃고, 말하고, 손 흔드는 영상이면 좋아요. 앱이 알아서 장면을 찾아 조각을 만들어요.</div></li>
+        <li><span class="ic">📱</span><div><b>폰을 세워 두세요.</b> 전면 카메라에 아기 얼굴이 보이면 돼요.</div></li>
+        <li><span class="ic">😊</span><div><b>아기가 반응하면 엄마가 대답해요.</b> 웃으면 웃는 엄마가, 손 흔들면 손 흔드는 엄마가, 옹알이하면 말하는 엄마가 나와요.</div></li>
+        <li><span class="ic">💤</span><div><b>딴 데 보면 영상이 잠들어요.</b> 다시 보거나 소리 내면 깨어나고, 정해진 시간이 되면 "안녕~" 하고 끝나요.</div></li>
+        <li><span class="ic">✨</span><div><b>화면을 터치해도 반응해요.</b> 카메라를 쓸 수 없을 때도 놀 수 있어요.</div></li>
+      </ul>
+    </div>
+
+    <ul id="clips" class="clips"></ul>
+  </section>
+
+  <details class="settings">
+    <summary>놀이 설정</summary>
+    <div class="settings-body">
+      <div class="field">한 번 놀이 시간
+        <div class="seg" id="minSeg" role="group" aria-label="한 번 놀이 시간"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="optMirror"> 아기 얼굴을 화면 구석에 작게 보여주기</label>
+      <label class="check"><input type="checkbox" id="optMic"> 옹알이(소리)에도 반응하기</label>
+      <label class="check"><input type="checkbox" id="optDebug"> 테스트 모드 (인식 수치와 수동 버튼 표시)</label>
+    </div>
+  </details>
+
+  <aside class="note">
+    <p>영상은 이 기기의 이 브라우저 안에만 저장돼요. 카메라 화면은 아기 반응을 알아채는 데만 쓰고, 저장하거나 어디로도 보내지 않아요. 모든 인식은 폰 안에서 처리돼요.</p>
+    <p>놀이를 끝내려면 오른쪽 위 자물쇠를 2초 동안 꾹 누르세요.</p>
+  </aside>
+</main>
+
+<div id="play" hidden>
+  <div id="stage">
+    <video id="mv" playsinline preload="auto"></video>
+    <div id="sleep" class="sleep" hidden><span>💤</span></div>
+  </div>
+  <video id="cam" class="mirror" playsinline muted autoplay></video>
+  <div id="pops"></div>
+  <div class="ptop">
+    <div id="clock" class="clock"></div>
+    <button id="lock" class="lock" type="button" aria-label="2초 동안 누르면 놀이를 끝내요">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"></circle></svg>🔒
+      <span class="lockTip" id="lockTip" hidden>꾹 누르고 있기</span>
+    </button>
+  </div>
+  <div id="dbg" class="dbg" hidden>
+    <pre id="dbgText"></pre>
+    <div class="dbgBtns">
+      <button type="button" data-ev="smile">😊 웃음</button>
+      <button type="button" data-ev="wave">👋 손</button>
+      <button type="button" data-ev="vocal">🎵 소리</button>
+      <button type="button" data-ev="look">👀 봄</button>
+      <button type="button" data-ev="away">💤 안 봄</button>
+    </div>
+  </div>
+
+  <div id="setup" class="cover">
+    <div class="preview"><video id="camBig" playsinline muted autoplay></video><div id="faceBox" class="faceBox" hidden></div></div>
+    <h2>아기 얼굴이 보이게 세워 주세요</h2>
+    <ul class="checks">
+      <li id="ckCam">카메라 준비 중…</li>
+      <li id="ckModel">인식 모델 불러오는 중…</li>
+      <li id="ckFace">얼굴 찾는 중…</li>
+    </ul>
+    <button id="go" class="bigplay" type="button">시작</button>
+    <button id="setupBack" class="btn ghost light sm" type="button">돌아가기</button>
+  </div>
+
+  <div id="end" class="cover" hidden>
+    <div class="wave" aria-hidden="true">👋</div>
+    <h2>안녕~ 재밌었다!</h2>
+    <p>이제 화면 끄고 엄마랑 진짜로 놀아요.</p>
+    <p class="small" id="endStats"></p>
+    <button id="endBack" class="btn ghost light sm" type="button">처음 화면으로</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

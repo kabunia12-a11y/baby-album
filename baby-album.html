@@ -1,0 +1,704 @@
+<title>아기 앨범</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=Jua&display=swap">
+<style>
+/* Layout: one narrow column for the parent (album → editor), a full-bleed dark stage for the baby. */
+:root {
+  --bg: #F3F6F9;
+  --surface: #FFFFFF;
+  --ink: #1C2433;
+  --muted: #5B687C;
+  --line: #DCE3EC;
+  --primary: #23706B;
+  --primary-ink: #FFFFFF;
+  --primary-soft: #E1F0EE;
+  --sun: #F2A93B;
+  --danger: #C2453B;
+  --stage: #0E131B;
+  --stage-ink: #F4F6FA;
+  --font-display: "Jua", "IBM Plex Sans KR", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10141B; --surface: #19202A; --ink: #E7ECF3; --muted: #98A4B7; --line: #2A3342;
+    --primary: #5DB8B0; --primary-ink: #0B1918; --primary-soft: #183330; --sun: #F5BE5A; --danger: #E2685D;
+    --stage: #05070B; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10141B; --surface: #19202A; --ink: #E7ECF3; --muted: #98A4B7; --line: #2A3342;
+  --primary: #5DB8B0; --primary-ink: #0B1918; --primary-soft: #183330; --sun: #F5BE5A; --danger: #E2685D;
+  --stage: #05070B; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+button, input, textarea, select { font: inherit; color: inherit; }
+.vh { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); }
+
+.wrap { max-width: 640px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 20px; }
+.top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.brand { font-family: var(--font-display); font-weight: 400; font-size: 30px; margin: 0; letter-spacing: -0.01em; }
+.sub { margin: 0; color: var(--muted); font-size: 14px; }
+h2 { font-size: 16px; font-weight: 600; margin: 0; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 16px;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 500; white-space: nowrap; }
+.btn:focus-visible, .chip:focus-visible, .thumb:focus-visible, .seg button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
+.btn.sm { min-height: 34px; padding: 0 12px; font-size: 14px; }
+.btn.big { min-height: 60px; font-size: 19px; font-family: var(--font-display); font-weight: 400; padding: 0 28px; }
+.btn.wide { width: 100%; }
+.btn[disabled] { opacity: .45; cursor: default; }
+.btn.rec { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+.warn { background: color-mix(in srgb, var(--sun) 18%, var(--surface)); border: 1px solid color-mix(in srgb, var(--sun) 50%, var(--line));
+  border-radius: var(--r); padding: 12px 14px; font-size: 14px; }
+
+.startbar { background: var(--primary-soft); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.startbar p { margin: 0; color: var(--muted); font-size: 14px; }
+
+.row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.clips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.clip { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 8px; }
+.thumb { width: 96px; aspect-ratio: 4 / 3; border-radius: 10px; border: 0; padding: 0; overflow: hidden; background: var(--stage); cursor: pointer; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.clip-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.clip-info b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clip-info span { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--sun) 22%, transparent); color: var(--ink); }
+.toggle { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; color: var(--muted); padding-right: 6px; cursor: pointer; }
+.toggle input { width: 22px; height: 22px; accent-color: var(--primary); }
+
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.empty h3 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 21px; }
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--muted); }
+.steps b { color: var(--ink); font-weight: 600; }
+
+details.settings { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 4px 16px; }
+details.settings summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+.settings-body { display: flex; flex-direction: column; gap: 16px; padding-bottom: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; font-weight: 500; font-size: 14px; }
+.field small { color: var(--muted); font-weight: 400; }
+.field input, .field textarea, .q { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 10px 12px; width: 100%; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { min-width: 48px; min-height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-variant-numeric: tabular-nums; }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+.note { color: var(--muted); font-size: 13px; line-height: 1.6; }
+.note p { margin: 0 0 6px; }
+
+/* editor */
+.ed-top { display: flex; justify-content: space-between; gap: 8px; }
+.title-input { font-family: var(--font-display); font-size: 24px; border: 0; border-bottom: 2px solid var(--line); background: transparent; padding: 4px 0; width: 100%; }
+.title-input:focus { outline: none; border-color: var(--primary); }
+.player { position: relative; background: var(--stage); border-radius: var(--r); overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; }
+.player video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.overlay { position: absolute; inset: 0; pointer-events: none; }
+.overlay.picking { pointer-events: auto; cursor: crosshair; background: rgba(0,0,0,.25); }
+.ring { position: absolute; border-radius: 50%; border: 3px dashed var(--sun); box-shadow: 0 0 0 9999px rgba(0,0,0,0); transform: translate(-50%, -50%); pointer-events: none; }
+.pickbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--sun); color: #1C2433; border-radius: var(--r); padding: 8px 8px 8px 14px; font-weight: 600; }
+.pickbar .btn { border-color: transparent; background: rgba(255,255,255,.6); color: #1C2433; }
+.curtime { font-variant-numeric: tabular-nums; opacity: .85; }
+.stops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.stop { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.stop.sel { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.stop-head { display: flex; align-items: center; gap: 8px; }
+.time { font-variant-numeric: tabular-nums; font-weight: 600; border: 0; background: var(--primary-soft); color: var(--primary); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+.kind { color: var(--muted); font-size: 13px; flex: 1; min-width: 0; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.stop-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.stop-row > span:first-child { font-size: 13px; color: var(--muted); width: 62px; flex: none; }
+.stop-row label.btn { cursor: pointer; }
+.status { font-size: 12px; color: var(--muted); }
+.stop-row select { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; min-height: 34px; padding: 0 10px; font-size: 14px; }
+.danger-zone { display: flex; justify-content: flex-end; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-width: min(520px, calc(100% - 32px));
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 50; box-shadow: 0 6px 24px rgba(0,0,0,.2); }
+
+/* baby stage */
+#baby { position: fixed; inset: 0; z-index: 40; background: var(--stage); color: var(--stage-ink); overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+#bStage { position: absolute; inset: 0; }
+#bVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+#bLayer { position: absolute; inset: 0; }
+#bLayer.asking { background: rgba(5,7,11,.18); }
+.bTop { position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding: 12px max(14px, env(safe-area-inset-right, 0px)) 0 max(14px, env(safe-area-inset-left, 0px)); pointer-events: none; z-index: 5; }
+.bHint { font-size: 13px; color: rgba(244,246,250,.72); background: rgba(5,7,11,.45); padding: 6px 10px; border-radius: 10px; max-width: 70%; }
+.bHint:empty { display: none; }
+.lock { pointer-events: auto; position: relative; width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(255,255,255,.12); color: rgba(255,255,255,.75); font-size: 12px; cursor: pointer; flex: none; }
+.lock svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.lock circle { fill: none; stroke: var(--sun); stroke-width: 4; stroke-dasharray: 138; stroke-dashoffset: 138; }
+.lock.holding circle { transition: stroke-dashoffset 1.5s linear; stroke-dashoffset: 0; }
+.lockTip { position: absolute; top: 54px; right: 0; white-space: nowrap; font-size: 12px; color: rgba(244,246,250,.7); }
+.subtitle { position: absolute; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 3; pointer-events: none;
+  font-family: var(--font-display); font-size: clamp(24px, 6vw, 40px); background: rgba(5,7,11,.6); padding: 8px 22px; border-radius: 999px; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+.hand { position: absolute; left: 50%; top: 50%; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 50%; background: rgba(242,169,59,.9);
+  display: grid; place-items: center; font-size: 44px; pointer-events: none; animation: pulse 1.4s ease-in-out infinite; }
+.glow { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; border: 4px solid var(--sun); box-shadow: 0 0 30px 8px rgba(242,169,59,.6); animation: pulse 1.1s ease-in-out infinite; }
+.star { position: absolute; font-size: 34px; color: var(--sun); pointer-events: none; animation: burst .9s ease-out forwards; text-shadow: 0 0 10px rgba(242,169,59,.7); }
+.ripple { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 3px solid rgba(255,255,255,.7); pointer-events: none; animation: ripple .6s ease-out forwards; }
+.cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; padding: 24px; z-index: 4; background: var(--stage); }
+.cover h2 { font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 8vw, 54px); margin: 0; }
+.cover p { margin: 0; color: rgba(244,246,250,.72); max-width: 32ch; }
+.wave { font-size: clamp(72px, 20vw, 140px); animation: wave 1.6s ease-in-out infinite; transform-origin: 70% 80%; }
+.bigplay { width: 140px; height: 140px; border-radius: 50%; border: 0; background: var(--sun); color: #1C2433; font-family: var(--font-display); font-size: 30px; cursor: pointer; box-shadow: 0 10px 40px rgba(242,169,59,.35); }
+@keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.08); opacity: .85; } }
+.glow { animation-name: glowpulse; }
+@keyframes glowpulse { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.1); } }
+@keyframes burst { from { transform: translate(-50%,-50%) scale(.4); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.2); opacity: 0; } }
+@keyframes ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+@keyframes wave { 0%,100% { transform: rotate(0); } 25% { transform: rotate(14deg); } 75% { transform: rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) { .hand, .glow, .wave { animation: none; } .star { animation-duration: .01s; } }
+@media (max-width: 420px) { .clip { grid-template-columns: 76px minmax(0, 1fr) auto; } .thumb { width: 76px; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1 class="brand">아기 앨범</h1>
+    <p class="sub">같이 보고, 묻고, 찾는 우리 가족 영상</p>
+  </header>
+
+  <div id="storeWarn" class="warn" hidden>이 브라우저에서는 영상을 저장할 수 없어서, 창을 닫으면 앨범이 비워져요. 일반(비공개 아님) 창에서 열어 주세요.</div>
+
+  <section id="home" class="wrap" style="padding:0">
+    <div class="startbar">
+      <button id="startBaby" class="btn big primary" type="button">아기 모드 시작</button>
+      <p id="startMeta">영상을 추가하고 질문을 넣으면 시작할 수 있어요.</p>
+    </div>
+
+    <div class="row-head">
+      <h2>앨범</h2>
+      <label class="btn sm" for="addFile">+ 영상 추가</label>
+      <input type="file" id="addFile" class="vh" accept="video/*" multiple>
+    </div>
+
+    <div id="empty" class="empty">
+      <h3>처음이라면 이렇게 해 보세요</h3>
+      <ol class="steps">
+        <li><b>영상 추가</b>로 아기나 엄마가 나온 짧은 영상을 골라요. 10~30초짜리가 좋아요.</li>
+        <li>영상을 열고 원하는 장면에서 <b>멈추고 질문하기</b>를 눌러요. "엄마 어디 있어?"처럼요.</li>
+        <li>질문을 엄마 목소리로 녹음하고, 아기가 <b>터치할 곳</b>(엄마 얼굴 등)을 영상에서 눌러 지정해요.</li>
+        <li>아기와 나란히 앉아 <b>아기 모드</b>를 시작해요. 정해진 개수만 보고 "안녕~" 하고 끝나요.</li>
+      </ol>
+    </div>
+
+    <ul id="clipList" class="clips"></ul>
+
+    <details class="settings">
+      <summary>아기 모드 설정</summary>
+      <div class="settings-body">
+        <div class="field">한 번에 볼 영상 수
+          <div class="seg" id="perSeg" role="group" aria-label="한 번에 볼 영상 수"></div>
+        </div>
+        <label class="field" for="mission">마지막 인사 (화면 밖 놀이로 이어주는 말)
+          <input id="mission" type="text" maxlength="60">
+        </label>
+      </div>
+    </details>
+
+    <aside class="note">
+      <p>영상과 녹음은 이 기기의 이 브라우저 안에만 저장되고, 어디로도 올라가지 않아요. 그래서 폰과 태블릿의 앨범은 따로 만들어야 해요.</p>
+      <p>아기 모드에서 나가려면 오른쪽 위 자물쇠를 2초 동안 꾹 누르세요.</p>
+    </aside>
+  </section>
+
+  <section id="editor" class="wrap" style="padding:0" hidden>
+    <div class="ed-top">
+      <button id="edBack" class="btn ghost sm" type="button">← 앨범</button>
+      <button id="edPreview" class="btn sm" type="button">▶ 아기 모드로 미리보기</button>
+    </div>
+    <input id="edName" class="title-input" aria-label="영상 이름" maxlength="40">
+    <div class="player" id="edPlayer">
+      <video id="edVideo" playsinline controls preload="metadata"></video>
+      <div id="edOverlay" class="overlay"></div>
+    </div>
+    <div id="pickBanner" class="pickbar" hidden>
+      <span>아기가 터치할 곳을 영상 위에서 눌러 주세요</span>
+      <button id="pickCancel" class="btn sm" type="button">취소</button>
+    </div>
+    <button id="addStop" class="btn primary wide" type="button">여기서 멈추고 질문하기 <span class="curtime" id="curTime">0:00</span></button>
+    <ol id="stopList" class="stops"></ol>
+    <label class="field" for="edHint">같이 볼 때 이야기 거리 <small>아기 모드 화면 위쪽에 부모용으로 작게 보여요.</small>
+      <textarea id="edHint" rows="2" placeholder="예: 지난 주말 할머니 댁 마당이에요. 강아지 이름을 같이 불러 보세요."></textarea>
+    </label>
+    <div class="danger-zone"><button id="edDelete" class="btn danger ghost sm" type="button">이 영상 삭제</button></div>
+  </section>
+</div>
+
+<div id="baby" hidden>
+  <div id="bStage">
+    <video id="bVideo" playsinline preload="auto"></video>
+    <div id="bLayer"></div>
+  </div>
+  <div class="bTop">
+    <div id="bHint" class="bHint"></div>
+    <button id="bLock" class="lock" type="button" aria-label="2초 동안 누르면 아기 모드를 끝내요">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"></circle></svg>🔒
+      <span class="lockTip" id="lockTip" hidden>꾹 누르고 있기</span>
+    </button>
+  </div>
+  <div id="bSub" class="subtitle" hidden></div>
+  <div id="bStart" class="cover">
+    <h2>같이 볼까요?</h2>
+    <p>아기와 나란히 앉아서 시작을 눌러 주세요. 질문이 나오면 아기가 화면을 터치해요.</p>
+    <button id="bGo" class="bigplay" type="button">시작</button>
+  </div>
+  <div id="bEnd" class="cover" hidden>
+    <div class="wave" aria-hidden="true">👋</div>
+    <h2>안녕~</h2>
+    <p id="bMission"></p>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const fmt = t => { t = Math.max(0, Math.floor(t || 0)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const QUESTIONS = ['엄마 어디 있어?', '아기 어디 있어?', '이건 뭐야?', '누구야?', '뭐 하고 있어?', '여기 어디야?'];
+const PRAISE = ['찾았다!', '우와, 맞아요!', '잘했어요!', '맞아, 거기 있네!'];
+const SIZES = [['작게', 0.13], ['보통', 0.19], ['크게', 0.27]];
+
+let toastTimer;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3800); }
+
+/* ---------- storage: IndexedDB on this device, memory if unavailable ---------- */
+const store = {
+  db: null, mem: { clips: new Map(), blobs: new Map() },
+  async init() {
+    try {
+      this.db = await new Promise((res, rej) => {
+        const r = indexedDB.open('baby-album', 1);
+        r.onupgradeneeded = () => { r.result.createObjectStore('clips', { keyPath: 'id' }); r.result.createObjectStore('blobs'); };
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+        setTimeout(() => rej(new Error('timeout')), 4000);
+      });
+      try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+    } catch (e) { this.db = null; $('storeWarn').hidden = false; }
+  },
+  tx(name, mode, fn) {
+    return new Promise((res, rej) => {
+      const t = this.db.transaction(name, mode); const req = fn(t.objectStore(name));
+      t.oncomplete = () => res(req && req.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+    });
+  },
+  async clips() { return this.db ? this.tx('clips', 'readonly', s => s.getAll()) : [...this.mem.clips.values()]; },
+  async putClip(c) { if (!this.db) return void this.mem.clips.set(c.id, c); await this.tx('clips', 'readwrite', s => s.put(c)); },
+  async delClip(id) { if (!this.db) return void this.mem.clips.delete(id); await this.tx('clips', 'readwrite', s => s.delete(id)); },
+  async putBlob(k, b) { if (!this.db) return void this.mem.blobs.set(k, b); await this.tx('blobs', 'readwrite', s => s.put(b, k)); },
+  async getBlob(k) { return this.db ? this.tx('blobs', 'readonly', s => s.get(k)) : this.mem.blobs.get(k); },
+  async delBlob(k) { urls.delete(k); if (!this.db) return void this.mem.blobs.delete(k); await this.tx('blobs', 'readwrite', s => s.delete(k)); },
+};
+const urls = new Map();
+async function urlFor(k) {
+  if (urls.has(k)) return urls.get(k);
+  const b = await store.getBlob(k); if (!b) return null;
+  const u = URL.createObjectURL(b); urls.set(k, u); return u;
+}
+
+let settings = { per: 3, mission: '이제 엄마랑 진짜로 놀아볼까?' };
+try { Object.assign(settings, JSON.parse(localStorage.getItem('baby-album-settings') || '{}')); } catch (e) {}
+function saveSettings() { try { localStorage.setItem('baby-album-settings', JSON.stringify(settings)); } catch (e) {} }
+
+let clips = [];
+
+/* ---------- adding videos ---------- */
+function probe(blob) {
+  return new Promise(res => {
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto';
+    const u = URL.createObjectURL(blob); let done = false;
+    const fin = thumb => { if (done) return; done = true; res({ duration: isFinite(v.duration) ? v.duration : 0, thumb }); v.removeAttribute('src'); v.load(); URL.revokeObjectURL(u); };
+    v.onloadedmetadata = () => { try { v.currentTime = Math.min(0.6, (v.duration || 1) / 2); } catch (e) { fin(null); } };
+    v.onseeked = () => {
+      try {
+        const s = 320 / Math.max(v.videoWidth, v.videoHeight); const c = document.createElement('canvas');
+        c.width = Math.round(v.videoWidth * s); c.height = Math.round(v.videoHeight * s);
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height); fin(c.toDataURL('image/jpeg', 0.72));
+      } catch (e) { fin(null); }
+    };
+    v.onerror = () => fin(null); setTimeout(() => fin(null), 8000);
+    v.src = u;
+  });
+}
+$('addFile').addEventListener('change', async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  for (const f of files) {
+    const id = uid();
+    try {
+      await store.putBlob('v:' + id, f);
+    } catch (err) { toast('저장 공간이 부족해요. 더 짧은 영상으로 잘라서 넣어 주세요.'); continue; }
+    const { duration, thumb } = await probe(f);
+    const d = new Date(f.lastModified || Date.now());
+    const clip = { id, name: `${d.getMonth() + 1}월 ${d.getDate()}일 영상`, created: Date.now(), duration, thumb, inAlbum: true, hint: '', stops: [] };
+    await store.putClip(clip); clips.push(clip);
+  }
+  renderHome();
+  if (files.length === 1 && clips.length) openEditor(clips[clips.length - 1].id);
+  else if (files.length) toast(`영상 ${files.length}개를 추가했어요. 하나씩 열어서 질문을 넣어 주세요.`);
+});
+
+/* ---------- home ---------- */
+function albumClips() { return clips.filter(c => c.inAlbum); }
+function renderHome() {
+  clips.sort((a, b) => b.created - a.created);
+  $('empty').hidden = clips.length > 0;
+  $('clipList').innerHTML = clips.map(c => `
+    <li class="clip" data-id="${c.id}">
+      <button class="thumb" type="button" data-act="edit" aria-label="${esc(c.name)} 편집">${c.thumb ? `<img src="${c.thumb}" alt="">` : ''}</button>
+      <div class="clip-info" data-act="edit"><b>${esc(c.name)}</b>
+        <span>${fmt(c.duration)} · ${c.stops.length ? `질문 ${c.stops.length}개` : '<span class="pill">질문 없음</span>'}</span></div>
+      <label class="toggle"><input type="checkbox" data-act="album" ${c.inAlbum ? 'checked' : ''}>아기 앨범</label>
+    </li>`).join('');
+  const n = albumClips().length;
+  $('startBaby').disabled = n === 0;
+  $('startMeta').textContent = n === 0
+    ? '영상을 추가하고 "아기 앨범"에 체크하면 시작할 수 있어요.'
+    : `앨범 영상 ${n}개 중 ${Math.min(n, settings.per)}개를 보여주고 "안녕~" 하고 끝나요.`;
+  $('perSeg').innerHTML = [1, 2, 3, 4, 5].map(k => `<button type="button" data-n="${k}" aria-pressed="${k === settings.per}">${k}개</button>`).join('');
+  $('mission').value = settings.mission;
+}
+$('clipList').addEventListener('click', e => {
+  const li = e.target.closest('.clip'); if (!li) return;
+  if (e.target.closest('[data-act="edit"]')) openEditor(li.dataset.id);
+});
+$('clipList').addEventListener('change', async e => {
+  if (e.target.dataset.act !== 'album') return;
+  const c = clips.find(x => x.id === e.target.closest('.clip').dataset.id);
+  c.inAlbum = e.target.checked; await store.putClip(c); renderHome();
+});
+$('perSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; settings.per = +b.dataset.n; saveSettings(); renderHome(); });
+$('mission').addEventListener('input', e => { settings.mission = e.target.value; saveSettings(); });
+$('startBaby').addEventListener('click', () => {
+  const pool = albumClips().slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  openBaby(pool.slice(0, settings.per));
+});
+
+/* ---------- editor ---------- */
+let cur = null, selStop = null, picking = null, recState = null, saveTimer;
+const ev = $('edVideo');
+function save(now) { clearTimeout(saveTimer); const c = cur; const go = () => store.putClip(c).catch(() => toast('저장하지 못했어요.')); now ? go() : (saveTimer = setTimeout(go, 400)); }
+async function openEditor(id) {
+  cur = clips.find(c => c.id === id); if (!cur) return;
+  selStop = null; cancelPick();
+  $('home').hidden = true; $('editor').hidden = false; window.scrollTo(0, 0);
+  $('edName').value = cur.name; $('edHint').value = cur.hint || '';
+  ev.src = await urlFor('v:' + cur.id) || '';
+  renderStops();
+}
+function closeEditor() {
+  if (recState) recState.rec.stop();
+  ev.pause(); cancelPick(); save(true);
+  $('editor').hidden = true; $('home').hidden = false; cur = null; renderHome();
+}
+$('edBack').addEventListener('click', closeEditor);
+$('edName').addEventListener('input', e => { cur.name = e.target.value || '이름 없는 영상'; save(); });
+$('edHint').addEventListener('input', e => { cur.hint = e.target.value; save(); });
+$('edPreview').addEventListener('click', () => { ev.pause(); save(true); openBaby([cur]); });
+$('edDelete').addEventListener('click', async e => {
+  const b = e.currentTarget;
+  if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = '한 번 더 누르면 삭제돼요'; setTimeout(() => { delete b.dataset.armed; b.textContent = '이 영상 삭제'; }, 3000); return; }
+  delete b.dataset.armed; b.textContent = '이 영상 삭제';
+  const c = cur; ev.removeAttribute('src');
+  await store.delBlob('v:' + c.id); for (const s of c.stops) if (s.audioKey) await store.delBlob(s.audioKey);
+  await store.delClip(c.id); clips = clips.filter(x => x !== c);
+  $('editor').hidden = true; $('home').hidden = false; cur = null; renderHome(); toast('영상을 삭제했어요.');
+});
+ev.addEventListener('timeupdate', () => { $('curTime').textContent = fmt(ev.currentTime); });
+ev.addEventListener('loadedmetadata', () => { if (cur && !cur.duration) { cur.duration = ev.duration; save(); } drawRings(); });
+window.addEventListener('resize', () => { drawRings(); });
+
+$('addStop').addEventListener('click', () => {
+  ev.pause();
+  const t = +ev.currentTime.toFixed(2);
+  if (cur.stops.some(s => Math.abs(s.t - t) < 0.5)) { toast('이 장면 근처에 이미 질문이 있어요. 영상을 조금 옮겨 주세요.'); return; }
+  const s = { id: uid(), t, q: '', audioKey: null, target: null };
+  cur.stops.push(s); cur.stops.sort((a, b) => a.t - b.t); selStop = s.id; save(); renderStops();
+  const el = document.querySelector(`.stop[data-id="${s.id}"] .q`); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); }
+});
+
+function renderStops() {
+  const L = $('stopList');
+  if (!cur.stops.length) { L.innerHTML = `<li class="note">영상을 재생하다가 아기에게 묻고 싶은 장면에서 위 버튼을 누르세요.</li>`; drawRings(); return; }
+  L.innerHTML = cur.stops.map(s => {
+    const recOn = recState && recState.stopId === s.id;
+    const sizeIdx = s.target ? SIZES.reduce((bi, z, i) => Math.abs(z[1] - s.target.r) < Math.abs(SIZES[bi][1] - s.target.r) ? i : bi, 0) : 1;
+    return `<li class="stop ${selStop === s.id ? 'sel' : ''}" data-id="${s.id}">
+      <div class="stop-head">
+        <button class="time" type="button" data-act="seek">${fmt(s.t)}</button>
+        <span class="kind">${s.target ? '정해진 곳을 터치하면 칭찬' : '아무 곳이나 터치하면 계속'}</span>
+        <button class="btn ghost sm" type="button" data-act="del">삭제</button>
+      </div>
+      <input class="q" type="text" id="q-${s.id}" value="${esc(s.q)}" placeholder="질문 (예: 엄마 어디 있어?)" maxlength="40" aria-label="질문">
+      <div class="chips">${QUESTIONS.map(q => `<button class="chip" type="button" data-act="chip">${q}</button>`).join('')}</div>
+      <div class="stop-row"><span>목소리</span>
+        <button class="btn sm ${recOn ? 'rec' : ''}" type="button" data-act="rec">${recOn ? '■ 멈추기' : '● 녹음'}</button>
+        <label class="btn sm">파일<input type="file" class="vh" accept="audio/*" data-act="file"></label>
+        <button class="btn sm" type="button" data-act="play">▶ 듣기</button>
+        ${s.audioKey ? `<button class="btn ghost sm" type="button" data-act="clearAudio">녹음 지우기</button>` : ''}
+        <span class="status">${s.audioKey ? '내 목소리' : '녹음이 없으면 질문 글자를 기계 음성으로 읽어요'}</span>
+      </div>
+      <div class="stop-row"><span>터치할 곳</span>
+        <button class="btn sm" type="button" data-act="pick">${s.target ? '다시 지정' : '영상에서 지정'}</button>
+        ${s.target ? `<select data-act="size" aria-label="터치 영역 크기">${SIZES.map((z, i) => `<option value="${z[1]}" ${i === sizeIdx ? 'selected' : ''}>${z[0]}</option>`).join('')}</select>
+        <button class="btn ghost sm" type="button" data-act="clearTarget">지정 해제</button>` : ''}
+      </div>
+    </li>`;
+  }).join('');
+  drawRings();
+}
+const stopOf = el => { const li = el.closest('.stop'); return li && cur.stops.find(s => s.id === li.dataset.id); };
+$('stopList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return; const s = stopOf(b); if (!s) return;
+  const act = b.dataset.act;
+  if (selStop !== s.id && act !== 'del') { selStop = s.id; document.querySelectorAll('.stop').forEach(li => li.classList.toggle('sel', li.dataset.id === s.id)); drawRings(); }
+  if (act === 'seek') { ev.pause(); ev.currentTime = s.t; }
+  else if (act === 'del') { if (s.audioKey) store.delBlob(s.audioKey); cur.stops = cur.stops.filter(x => x !== s); save(); renderStops(); }
+  else if (act === 'chip') { s.q = b.textContent; $('q-' + s.id).value = s.q; save(); }
+  else if (act === 'rec') toggleRec(s);
+  else if (act === 'play') say(s.q, s.audioKey);
+  else if (act === 'clearAudio') { await store.delBlob(s.audioKey); s.audioKey = null; save(); renderStops(); }
+  else if (act === 'pick') startPick(s);
+  else if (act === 'clearTarget') { s.target = null; save(); renderStops(); }
+});
+$('stopList').addEventListener('input', e => { if (e.target.classList.contains('q')) { const s = stopOf(e.target); s.q = e.target.value; save(); } });
+$('stopList').addEventListener('focusin', e => { const s = stopOf(e.target); if (s && selStop !== s.id) { selStop = s.id; document.querySelectorAll('.stop').forEach(li => li.classList.toggle('sel', li.dataset.id === s.id)); drawRings(); } });
+$('stopList').addEventListener('change', async e => {
+  const s = stopOf(e.target); if (!s) return;
+  if (e.target.dataset.act === 'size') { s.target.r = +e.target.value; save(); drawRings(); }
+  if (e.target.dataset.act === 'file' && e.target.files[0]) { await setAudio(s, e.target.files[0]); renderStops(); }
+});
+
+async function setAudio(s, blob) {
+  const key = 'a:' + s.id;
+  try { await store.putBlob(key, blob); } catch (e) { toast('녹음을 저장하지 못했어요.'); return; }
+  urls.delete(key); s.audioKey = key; save(true);
+}
+async function toggleRec(s) {
+  if (recState) { recState.rec.stop(); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { toast('이 화면에서는 마이크를 바로 쓸 수 없어요. "파일"로 녹음 파일을 고르거나, 비워 두면 질문 글자를 읽어 줘요.'); return; }
+  const chunks = []; const rec = new MediaRecorder(stream);
+  rec.ondataavailable = ev => { if (ev.data.size) chunks.push(ev.data); };
+  rec.onstop = async () => {
+    clearTimeout(recState && recState.timer); stream.getTracks().forEach(t => t.stop());
+    const sid = recState.stopId; recState = null;
+    const target = cur && cur.stops.find(x => x.id === sid);
+    if (target && chunks.length) await setAudio(target, new Blob(chunks, { type: rec.mimeType || 'audio/webm' }));
+    if (cur) renderStops();
+  };
+  rec.start(); recState = { rec, stopId: s.id, timer: setTimeout(() => rec.state === 'recording' && rec.stop(), 15000) };
+  renderStops();
+}
+
+function contentBox(v) {
+  const W = v.clientWidth, H = v.clientHeight, vw = v.videoWidth || 4, vh = v.videoHeight || 3;
+  const k = Math.min(W / vw, H / vh), w = vw * k, h = vh * k;
+  return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+}
+function drawRings() {
+  const O = $('edOverlay'); O.querySelectorAll('.ring').forEach(n => n.remove());
+  if (!cur) return;
+  const s = cur.stops.find(x => x.id === selStop); if (!s || !s.target) return;
+  const b = contentBox(ev), r = s.target.r * Math.min(b.w, b.h);
+  const d = document.createElement('div'); d.className = 'ring';
+  Object.assign(d.style, { left: b.x + s.target.x * b.w + 'px', top: b.y + s.target.y * b.h + 'px', width: r * 2 + 'px', height: r * 2 + 'px' });
+  O.appendChild(d);
+}
+function startPick(s) {
+  picking = s; ev.pause(); ev.currentTime = s.t;
+  $('edOverlay').classList.add('picking'); $('pickBanner').hidden = false;
+  $('edPlayer').scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+function cancelPick() { picking = null; $('edOverlay').classList.remove('picking'); $('pickBanner').hidden = true; }
+$('pickCancel').addEventListener('click', cancelPick);
+$('edOverlay').addEventListener('pointerdown', e => {
+  if (!picking) return; e.preventDefault();
+  const rect = e.currentTarget.getBoundingClientRect(), b = contentBox(ev);
+  const x = (e.clientX - rect.left - b.x) / b.w, y = (e.clientY - rect.top - b.y) / b.h;
+  if (x < 0 || x > 1 || y < 0 || y > 1) { toast('영상 화면 안쪽을 눌러 주세요.'); return; }
+  const s = picking; s.target = { x: +x.toFixed(4), y: +y.toFixed(4), r: s.target ? s.target.r : SIZES[1][1] };
+  selStop = s.id; cancelPick(); save(true); renderStops();
+});
+
+/* ---------- voice ---------- */
+let curAudio = null;
+function koVoice() { try { return speechSynthesis.getVoices().find(v => /^ko/i.test(v.lang)); } catch (e) { return null; } }
+function tts(text, fin) {
+  if (!text || !('speechSynthesis' in window)) return fin();
+  try {
+    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR'; u.rate = 0.9; u.pitch = 1.15; const v = koVoice(); if (v) u.voice = v;
+    u.onend = fin; u.onerror = fin; speechSynthesis.speak(u);
+  } catch (e) { fin(); }
+}
+function say(text, audioKey) {
+  return new Promise(async res => {
+    let done = false; const fin = () => { if (!done) { done = true; res(); } };
+    setTimeout(fin, audioKey ? 12000 : 1800 + String(text || '').length * 220);
+    stopVoice();
+    if (audioKey) {
+      try {
+        const u = await urlFor(audioKey);
+        if (u) { const a = new Audio(u); curAudio = a; a.onended = fin; a.onerror = () => tts(text, fin); await a.play(); return; }
+      } catch (e) {}
+    }
+    tts(text, fin);
+  });
+}
+function stopVoice() { try { speechSynthesis.cancel(); } catch (e) {} if (curAudio) { curAudio.pause(); curAudio = null; } }
+
+/* ---------- baby mode ---------- */
+const bv = $('bVideo'), layer = $('bLayer');
+const B = { queue: [], i: 0, clip: null, stops: [], next: 0, mode: 'idle', misses: 0, timers: [], raf: 0, ac: null, wake: null };
+const later = (fn, ms) => B.timers.push(setTimeout(fn, ms));
+function clearTimers() { B.timers.forEach(clearTimeout); B.timers = []; }
+
+function openBaby(list) {
+  if (!list.length) return;
+  B.queue = list; B.i = 0; B.mode = 'start';
+  $('baby').hidden = false; $('bStart').hidden = false; $('bEnd').hidden = true; $('bSub').hidden = true; $('bHint').textContent = '';
+  document.body.style.overflow = 'hidden';
+}
+$('bGo').addEventListener('click', async () => {
+  try { B.ac = B.ac || new (window.AudioContext || window.webkitAudioContext)(); B.ac.resume(); } catch (e) {}
+  try { B.wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+  try { await document.documentElement.requestFullscreen(); } catch (e) {}
+  $('bStart').hidden = true; playClip(0);
+});
+async function playClip(i) {
+  clearTimers(); clearLayer();
+  if (i >= B.queue.length) return endSession();
+  B.i = i; B.clip = B.queue[i]; B.stops = B.clip.stops.slice().sort((a, b) => a.t - b.t); B.next = 0;
+  $('bHint').textContent = B.clip.hint || '';
+  const u = await urlFor('v:' + B.clip.id);
+  if (!u) return playClip(i + 1);
+  bv.src = u; B.mode = 'play';
+  try { await bv.play(); } catch (e) { B.mode = 'start'; $('bStart').hidden = false; return; }
+  cancelAnimationFrame(B.raf); tick();
+}
+function tick() {
+  if (B.mode === 'play' && B.next < B.stops.length && bv.currentTime >= B.stops[B.next].t) ask(B.stops[B.next]);
+  if (B.mode !== 'idle') B.raf = requestAnimationFrame(tick);
+}
+bv.addEventListener('ended', () => {
+  if (B.mode !== 'play') return;
+  if (B.next < B.stops.length) ask(B.stops[B.next]); else afterClip();
+});
+function afterClip() { B.mode = 'between'; later(() => playClip(B.i + 1), 900); }
+
+function ask(s) {
+  B.mode = 'ask'; bv.pause(); B.misses = 0; clearTimers(); clearLayer();
+  layer.classList.add('asking');
+  const sub = $('bSub'); sub.textContent = s.q || ''; sub.hidden = !s.q;
+  if (!s.target) { const h = document.createElement('div'); h.className = 'hand'; h.textContent = '👆'; layer.appendChild(h); }
+  say(s.q, s.audioKey);
+  const remind = () => { if (B.mode !== 'ask') return; if (s.target) showGlow(s); say(s.q, s.audioKey); later(remind, 9000); };
+  later(remind, 8000);
+}
+function targetPx(s) {
+  const b = contentBox(bv);
+  return { x: b.x + s.target.x * b.w, y: b.y + s.target.y * b.h, r: s.target.r * Math.min(b.w, b.h) };
+}
+layer.addEventListener('pointerdown', e => {
+  if (B.mode !== 'ask') return; e.preventDefault();
+  const rect = layer.getBoundingClientRect(), p = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  const s = B.stops[B.next];
+  if (!s.target) return success(p);
+  const t = targetPx(s);
+  if (Math.hypot(p.x - t.x, p.y - t.y) <= t.r * 1.25) success(t);
+  else { ripple(p); if (++B.misses >= 2) showGlow(s); }
+});
+function success(p) {
+  B.mode = 'cheer'; clearTimers(); clearLayer(); burst(p); chime();
+  const t0 = Date.now();
+  say(PRAISE[Math.floor(Math.random() * PRAISE.length)]).then(() => later(resume, Math.max(250, 1300 - (Date.now() - t0))));
+}
+function resume() {
+  if (B.mode !== 'cheer') return;
+  clearLayer(); $('bSub').hidden = true; B.next++;
+  if (bv.ended || (bv.duration && bv.currentTime >= bv.duration - 0.05)) {
+    if (B.next < B.stops.length) ask(B.stops[B.next]); else afterClip();
+    return;
+  }
+  B.mode = 'play'; bv.play().catch(() => {});
+}
+function clearLayer() { layer.innerHTML = ''; layer.classList.remove('asking'); }
+function showGlow(s) {
+  if (layer.querySelector('.glow')) return;
+  const t = targetPx(s), g = document.createElement('div'); g.className = 'glow';
+  Object.assign(g.style, { left: t.x + 'px', top: t.y + 'px', width: t.r * 2 + 'px', height: t.r * 2 + 'px' });
+  layer.appendChild(g);
+}
+function ripple(p) { const r = document.createElement('div'); r.className = 'ripple'; r.style.left = p.x + 'px'; r.style.top = p.y + 'px'; layer.appendChild(r); setTimeout(() => r.remove(), 650); }
+function burst(p) {
+  for (let k = 0; k < 10; k++) {
+    const st = document.createElement('div'); st.className = 'star'; st.textContent = '★';
+    const a = (k / 10) * Math.PI * 2, d = 70 + Math.random() * 60;
+    st.style.left = p.x + 'px'; st.style.top = p.y + 'px';
+    st.style.setProperty('--dx', Math.cos(a) * d + 'px'); st.style.setProperty('--dy', Math.sin(a) * d + 'px');
+    $('bStage').appendChild(st); setTimeout(() => st.remove(), 950);
+  }
+}
+function chime() {
+  const ac = B.ac; if (!ac) return;
+  try {
+    const t = ac.currentTime;
+    [659.25, 987.77].forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain(), s = t + i * 0.12;
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, s); g.gain.linearRampToValueAtTime(0.25, s + 0.02); g.gain.exponentialRampToValueAtTime(0.001, s + 0.6);
+      o.connect(g).connect(ac.destination); o.start(s); o.stop(s + 0.65);
+    });
+  } catch (e) {}
+}
+function endSession() {
+  B.mode = 'end'; clearTimers(); clearLayer(); bv.pause(); bv.removeAttribute('src'); bv.load();
+  $('bSub').hidden = true; $('bHint').textContent = '';
+  $('bMission').textContent = settings.mission; $('bEnd').hidden = false;
+  say('안녕~ ' + (settings.mission || ''));
+}
+function exitBaby() {
+  B.mode = 'idle'; clearTimers(); cancelAnimationFrame(B.raf); clearLayer(); stopVoice();
+  bv.pause(); bv.removeAttribute('src'); bv.load();
+  try { B.wake && B.wake.release(); } catch (e) {} B.wake = null;
+  try { document.fullscreenElement && document.exitFullscreen(); } catch (e) {}
+  $('baby').hidden = true; document.body.style.overflow = '';
+}
+
+/* hold-to-exit lock */
+let holdTimer;
+const lock = $('bLock');
+lock.addEventListener('pointerdown', e => {
+  e.stopPropagation(); e.preventDefault(); lock.classList.add('holding'); $('lockTip').hidden = false;
+  holdTimer = setTimeout(() => { lock.classList.remove('holding'); $('lockTip').hidden = true; exitBaby(); }, 1500);
+});
+['pointerup', 'pointerleave', 'pointercancel'].forEach(t => lock.addEventListener(t, () => { clearTimeout(holdTimer); lock.classList.remove('holding'); setTimeout(() => $('lockTip').hidden = true, 900); }));
+lock.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('visibilitychange', () => { if (document.hidden && B.mode === 'play') bv.pause(); else if (!document.hidden && B.mode === 'play') bv.play().catch(() => {}); });
+
+/* boot */
+(async () => {
+  await store.init();
+  try { clips = await store.clips(); } catch (e) { clips = []; }
+  renderHome();
+  try { speechSynthesis.getVoices(); } catch (e) {}
+})();
+})();
+</script>

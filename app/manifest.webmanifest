@@ -1,0 +1,17 @@
+{
+  "name": "아기 앨범",
+  "short_name": "아기 앨범",
+  "description": "아기가 웃고, 손 흔들고, 소리 내면 앨범 속 엄마 영상이 반응해요.",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0E131B",
+  "theme_color": "#23706B",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
