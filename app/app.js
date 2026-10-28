@@ -52,9 +52,27 @@ const store = {
   async clips() { return this.db ? this.tx('clips', 'readonly', s => s.getAll()) : [...this.mem.clips.values()]; },
   async putClip(c) { if (!this.db) return void this.mem.clips.set(c.id, c); await this.tx('clips', 'readwrite', s => s.put(c)); },
   async delClip(id) { if (!this.db) return void this.mem.clips.delete(id); await this.tx('clips', 'readwrite', s => s.delete(id)); },
-  async putBlob(k, b) { if (!this.db) return void this.mem.blobs.set(k, b); await this.tx('blobs', 'readwrite', s => s.put(b, k)); },
-  async getBlob(k) { return this.db ? this.tx('blobs', 'readonly', s => s.get(k)) : this.mem.blobs.get(k); },
-  async delBlob(k) { if (urls.has(k)) { URL.revokeObjectURL(urls.get(k)); urls.delete(k); } if (!this.db) return void this.mem.blobs.delete(k); await this.tx('blobs', 'readwrite', s => s.delete(k)); },
+  // Safari rejects File/Blob values from <input type=file> in IndexedDB, so store raw bytes.
+  // If that still fails (quota, private mode), keep the video in memory for this session.
+  async putBlob(k, b) {
+    if (!this.db) { this.mem.blobs.set(k, b); return false; }
+    try {
+      const rec = { buf: await b.arrayBuffer(), type: b.type || 'video/mp4' };
+      await this.tx('blobs', 'readwrite', s => s.put(rec, k));
+      return true;
+    } catch (e) {
+      console.warn('blob store failed', e);
+      this.mem.blobs.set(k, b);
+      return false;
+    }
+  },
+  async getBlob(k) {
+    if (this.mem.blobs.has(k)) return this.mem.blobs.get(k);
+    if (!this.db) return undefined;
+    const v = await this.tx('blobs', 'readonly', s => s.get(k));
+    return v && v.buf ? new Blob([v.buf], { type: v.type }) : v;
+  },
+  async delBlob(k) { if (urls.has(k)) { URL.revokeObjectURL(urls.get(k)); urls.delete(k); } this.mem.blobs.delete(k); if (!this.db) return; await this.tx('blobs', 'readwrite', s => s.delete(k)); },
 };
 const urls = new Map();
 async function urlFor(k) {
@@ -284,14 +302,18 @@ function renderClipProgress(c) {
 
 $('pick').addEventListener('change', async e => {
   const files = [...e.target.files]; e.target.value = '';
+  let unsaved = 0;
   for (const f of files) {
     const id = uid();
-    try { await store.putBlob('v:' + id, f); }
-    catch (err) { toast('저장 공간이 부족해요. 더 짧은 영상으로 골라 주세요.'); continue; }
+    let saved = false;
+    try { saved = await store.putBlob('v:' + id, f); }
+    catch (err) { toast('영상을 읽지 못했어요. 다른 영상을 골라 주세요.'); continue; }
+    if (!saved) unsaved++;
     const d = new Date(f.lastModified || Date.now());
-    const c = { id, name: `${d.getMonth() + 1}월 ${d.getDate()}일 영상`, created: Date.now(), status: 'queued', progress: 0, use: true, segs: [] };
-    clips.push(c); await store.putClip(c); queue.push(c.id);
+    const c = { id, name: `${d.getMonth() + 1}월 ${d.getDate()}일 영상`, created: Date.now(), status: 'queued', progress: 0, use: true, segs: [], temp: !saved };
+    clips.push(c); try { await store.putClip(c); } catch (err) {} queue.push(c.id);
   }
+  if (unsaved) toast('이 기기에 저장하지 못해서 지금만 쓸 수 있어요. 창을 닫으면 다시 골라야 해요.');
   renderHome(); runQueue();
 });
 async function runQueue() {
@@ -709,6 +731,9 @@ document.addEventListener('visibilitychange', async () => {
 (async () => {
   await store.init();
   try { clips = await store.clips(); } catch (e) { clips = []; }
+  // Session-only clips lost their video when the page closed.
+  for (const c of clips.filter(c => c.temp)) { try { await store.delClip(c.id); } catch (e) {} }
+  clips = clips.filter(c => !c.temp);
   for (const c of clips) if (c.status === 'analyzing' || c.status === 'queued') { c.status = 'queued'; queue.push(c.id); }
   renderHome(); runQueue();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
