@@ -87,17 +87,19 @@ const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmar
 const HAND_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 let lastTs = 0;
 const ts = () => (lastTs = Math.max(Math.round(performance.now()), lastTs + 1));
-let visionP = null;
-function loadVision() {
+let visionP = null, visionMode = null;
+function loadVision(only) {
+  if (only && visionMode !== only) { visionP = null; visionMode = only; }
   if (!visionP) visionP = (async () => {
     // The MediaPipe wasm build logs through a global `dbg` it never defines; without it, model setup throws.
     if (typeof globalThis.dbg !== 'function') globalThis.dbg = () => {};
     const m = await import(`${MP}/vision_bundle.mjs`);
     const fs = await m.FilesetResolver.forVisionTasks(`${MP}/wasm`);
+    let used = null;
     const make = async (Cls, path, extra) => {
       let err;
-      for (const delegate of ['GPU', 'CPU']) {
-        try { return await Cls.createFromOptions(fs, { baseOptions: { modelAssetPath: path, delegate }, runningMode: 'VIDEO', ...extra }); }
+      for (const delegate of only ? [only] : ['GPU', 'CPU']) {
+        try { const r = await Cls.createFromOptions(fs, { baseOptions: { modelAssetPath: path, delegate }, runningMode: 'VIDEO', ...extra }); used = used || delegate; return r; }
         catch (e) { err = e; }
       }
       throw err;
@@ -105,7 +107,7 @@ function loadVision() {
     const face = await make(m.FaceLandmarker, FACE_MODEL, { numFaces: 2, outputFaceBlendshapes: true, minFaceDetectionConfidence: 0.4, minFacePresenceConfidence: 0.4 });
     let hand = null;
     try { hand = await make(m.HandLandmarker, HAND_MODEL, { numHands: 2, minHandDetectionConfidence: 0.4 }); } catch (e) { console.warn('hand model unavailable', e); }
-    return { face, hand };
+    return { face, hand, delegate: used };
   })().catch(e => { console.warn('vision unavailable', e); return null; });
   return visionP;
 }
@@ -378,6 +380,14 @@ const sensor = {
     if (!stream) stream = await navigator.mediaDevices.getUserMedia(want);
     this.stream = stream;
     for (const c of cams) { c.srcObject = stream; c.play().catch(() => {}); }
+    // Recognition reads from its own always-rendered video: phone browsers pause a muted video
+    // once it is hidden, and the setup preview is hidden as soon as play starts.
+    if (!this.src) {
+      const v = this.src = document.createElement('video');
+      v.muted = true; v.playsInline = true; v.autoplay = true; v.setAttribute('playsinline', ''); v.className = 'sensorSrc';
+      document.body.appendChild(v);
+    }
+    this.src.srcObject = stream; this.src.play().catch(() => {});
     if (stream.getAudioTracks().length) {
       try {
         this.ac = audio.ctx();
@@ -385,21 +395,27 @@ const sensor = {
         this.an = this.ac.createAnalyser(); this.an.fftSize = 1024; this.buf = new Float32Array(1024); src.connect(this.an);
       } catch (e) { this.an = null; }
     }
-    this.on = true; this.cam = cams[0]; this.loop();
+    this.on = true; this.cam = this.src; this.fails = 0; this.loop();
   },
   stop() {
     this.on = false; clearTimeout(this.timer);
     if (this.stream) this.stream.getTracks().forEach(t => t.stop());
     this.stream = null; this.an = null;
+    if (this.src) this.src.srcObject = null;
   },
   loop() {
     if (!this.on) return;
     const now = performance.now(), st = this.st, cam = this.cam, V = this.V;
+    if (cam && cam.paused) cam.play().catch(() => {});
     if (cam && cam.readyState >= 2 && cam.videoWidth) {
       st.mot = this.motion(cam);
       st.motAvg = st.motAvg * 0.97 + st.mot * 0.03;
       if (V) {
-        const f = readFace(safeDetect(V.face, cam));
+        const raw = safeDetect(V.face, cam);
+        // Some phones create the GPU model fine but then fail every frame; rebuild it on the CPU once.
+        if (!raw && ++this.fails === 30 && V.delegate === 'GPU') { this.V = null; loadVision('CPU').then(nv => { if (this.on) this.V = nv; }); }
+        if (raw) this.fails = 0;
+        const f = readFace(raw);
         st.face = f;
         if (f) {
           if (st.absent && now - st.faceLostAt > 1200) this.emit('look');
@@ -408,7 +424,7 @@ const sensor = {
           else st.smileSince = 0;
         } else {
           st.smile = 0; st.smileSince = 0;
-          if (!st.absent && now - st.lastFace > 3000) { st.absent = true; st.faceLostAt = now; this.emit('away'); }
+          if (!st.absent && now - st.lastFace > 5000) { st.absent = true; st.faceLostAt = now; this.emit('away'); }
         }
         if (V.hand && this.frame++ % 2 === 0) {
           const h = safeDetect(V.hand, cam); const ws = (h?.landmarks || []).map(l => l[0]);
@@ -488,8 +504,21 @@ async function enterWait(clipId) {
   await useClip(c.id);
   if (token !== G.segToken) return; // a reaction started while the clip was loading
   mv.pause(); mv.muted = true;
-  await seekTo(mv, c.restT || 0);
-  if (G.state === 'wait') setTimeout(() => { sensor.listen = true; }, 500);
+  const from = c.restT || 0;
+  await seekTo(mv, from);
+  if (token !== G.segToken || G.state !== 'wait') return;
+  setTimeout(() => { sensor.listen = true; }, 500);
+  // Keep the waiting picture alive: slowly loop a calm few seconds, muted, instead of a frozen frame.
+  const to = Math.min(from + 3, (mv.duration || from + 3) - 0.1);
+  if (to - from < 0.8) return;
+  mv.playbackRate = 0.6;
+  try { await mv.play(); } catch (e) { return; }
+  const idle = () => {
+    if (token !== G.segToken || G.state !== 'wait') return;
+    if (mv.currentTime >= to || mv.ended) { mv.currentTime = from; if (mv.paused) mv.play().catch(() => {}); }
+    setTimeout(idle, 120);
+  };
+  idle();
 }
 async function playSeg(seg, after, from) {
   if (!seg) return enterWait(G.clipId);
@@ -497,6 +526,7 @@ async function playSeg(seg, after, from) {
   G.state = 'react'; sensor.listen = false; stageEl.className = 'react';
   await useClip(seg.clipId);
   if (token !== G.segToken) return;
+  mv.pause(); mv.playbackRate = 1;
   await seekTo(mv, from ?? seg.start);
   mv.muted = false;
   try { await mv.play(); } catch (e) { mv.muted = true; try { await mv.play(); } catch (e2) {} }
@@ -557,6 +587,7 @@ async function imitate(seg) {
   stageEl.className = 'react';
   await useClip(seg.clipId);
   if (token !== G.segToken) return;
+  mv.pause(); mv.playbackRate = 1;
   await seekTo(mv, seg.start);
   mv.muted = false;
   try { await mv.play(); } catch (e) {}
@@ -577,7 +608,7 @@ function imitateDone(copied) {
   playSeg(seg, null, G.imFrom);
 }
 function goSleep() {
-  G.state = 'sleep'; mv.pause(); stageEl.className = 'sleeping'; $('sleep').hidden = false;
+  G.segToken++; G.state = 'sleep'; mv.pause(); stageEl.className = 'sleeping'; $('sleep').hidden = false;
   audio.chime([523.25, 392], 0.25, 0.08);
 }
 function wakeUp(type) {
@@ -594,7 +625,7 @@ function heartbeat() {
   if (G.state === 'wait') {
     if (now > G.endAt) return finish();
     const faceOk = !sensor.V || (sensor.st.face && !sensor.st.absent);
-    if (now - G.lastAct > 12000 && now - G.invitedAt > 20000 && faceOk) {
+    if (now - G.lastAct > 9000 && now - G.invitedAt > 16000 && faceOk) {
       G.invitedAt = now; G.lastAct = now;
       const copyable = sensor.stream ? G.segs.filter(s => (s.label === 'wave' || s.label === 'smile') && s.end - s.start >= 1.5) : [];
       if (copyable.length && Math.random() < 0.7) imitate(pickOne(copyable));
@@ -602,6 +633,7 @@ function heartbeat() {
     }
   }
   if (G.state === 'sleep' && now > G.endAt) finish();
+  $('cam').classList.toggle('seen', !!(sensor.V && sensor.st.face));
   if (settings.debug) renderDebug();
 }
 function renderDebug() {
@@ -724,7 +756,10 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('visibilitychange', async () => {
   if (document.hidden) { if (G.state === 'react' || G.state === 'wait') mv.pause(); }
-  else if (G.state !== 'idle' && G.state !== 'end') { try { G.wake = await navigator.wakeLock?.request('screen'); } catch (e) {} }
+  else if (G.state !== 'idle' && G.state !== 'end') {
+    if (G.state === 'wait') mv.play().catch(() => {});
+    try { G.wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+  }
 });
 
 /* =============================== boot =============================== */
