@@ -469,13 +469,13 @@ async function enterWait(clipId) {
   await seekTo(mv, c.restT || 0);
   if (G.state === 'wait') setTimeout(() => { sensor.listen = true; }, 500);
 }
-async function playSeg(seg, after) {
+async function playSeg(seg, after, from) {
   if (!seg) return enterWait(G.clipId);
   const token = ++G.segToken;
   G.state = 'react'; sensor.listen = false; stageEl.className = 'react';
   await useClip(seg.clipId);
   if (token !== G.segToken) return;
-  await seekTo(mv, seg.start);
+  await seekTo(mv, from ?? seg.start);
   mv.muted = false;
   try { await mv.play(); } catch (e) { mv.muted = true; try { await mv.play(); } catch (e2) {} }
   await new Promise(res => {
@@ -517,10 +517,42 @@ function onSense(type) {
   if (G.stats[type] !== undefined && G.state !== 'react') G.stats[type]++;
   if (type === 'away') { if (G.state === 'wait') goSleep(); return; }
   if (G.state === 'sleep') { if (type !== 'away') wakeUp(type); return; }
+  if (G.state === 'imitate') {
+    if (type === 'away') return;
+    // Exact copy counts at once; after a few seconds any try counts, so it never feels like failing.
+    if (type === G.want || performance.now() - G.imStart > 3500) { popAt(type); imitateDone(true); }
+    return;
+  }
   if (G.state !== 'wait') return;
   popAt(type); audio.chime(type === 'smile' ? [784, 1046.5] : type === 'vocal' ? [523.25, 659.25] : [659.25, 880], 0.1, 0.12);
   G.lastAct = performance.now();
   playSeg(pickSeg(type));
+}
+// "따라 해 봐": show the start of a smile/wave piece, freeze it, and wait for the baby to copy it.
+async function imitate(seg) {
+  const token = ++G.segToken;
+  G.state = 'imitate'; G.want = seg.label; sensor.listen = false;
+  stageEl.className = 'react';
+  await useClip(seg.clipId);
+  if (token !== G.segToken) return;
+  await seekTo(mv, seg.start);
+  mv.muted = false;
+  try { await mv.play(); } catch (e) {}
+  await wait(Math.min(1400, (seg.end - seg.start) * 450));
+  if (token !== G.segToken) return;
+  mv.pause();
+  G.imSeg = seg; G.imFrom = mv.currentTime; G.imStart = performance.now();
+  $('play').classList.add('imitating'); stageEl.className = 'waiting';
+  audio.chime([659.25, 783.99], 0.15, 0.1);
+  setTimeout(() => { if (token === G.segToken) sensor.listen = true; }, 300);
+  setTimeout(() => { if (token === G.segToken && G.state === 'imitate') imitateDone(false); }, 9000);
+}
+function imitateDone(copied) {
+  $('play').classList.remove('imitating');
+  const seg = G.imSeg; G.imSeg = null;
+  if (copied) { G.stats.copy = (G.stats.copy || 0) + 1; burst(); audio.chime([523.25, 659.25, 783.99, 1046.5], 0.09, 0.15); }
+  G.lastAct = performance.now();
+  playSeg(seg, null, G.imFrom);
 }
 function goSleep() {
   G.state = 'sleep'; mv.pause(); stageEl.className = 'sleeping'; $('sleep').hidden = false;
@@ -540,7 +572,12 @@ function heartbeat() {
   if (G.state === 'wait') {
     if (now > G.endAt) return finish();
     const faceOk = !sensor.V || (sensor.st.face && !sensor.st.absent);
-    if (now - G.lastAct > 15000 && now - G.invitedAt > 22000 && faceOk) { G.invitedAt = now; G.lastAct = now; playSeg(pickSeg('invite')); }
+    if (now - G.lastAct > 12000 && now - G.invitedAt > 20000 && faceOk) {
+      G.invitedAt = now; G.lastAct = now;
+      const copyable = sensor.stream ? G.segs.filter(s => (s.label === 'wave' || s.label === 'smile') && s.end - s.start >= 1.5) : [];
+      if (copyable.length && Math.random() < 0.7) imitate(pickOne(copyable));
+      else playSeg(pickSeg('invite'));
+    }
   }
   if (G.state === 'sleep' && now > G.endAt) finish();
   if (settings.debug) renderDebug();
@@ -563,10 +600,10 @@ async function finish() {
   else showEnd();
 }
 function showEnd() {
-  G.state = 'end'; G.segToken++; mv.pause(); sensor.stop();
+  G.state = 'end'; G.segToken++; mv.pause(); sensor.stop(); $('play').classList.remove('imitating');
   try { G.wake?.release(); } catch (e) {} G.wake = null;
   const s = G.stats, parts = [];
-  if (s.smile) parts.push(`웃음 ${s.smile}번`); if (s.wave) parts.push(`손짓 ${s.wave}번`); if (s.vocal) parts.push(`옹알이 ${s.vocal}번`); if (s.touch) parts.push(`터치 ${s.touch}번`);
+  if (s.smile) parts.push(`웃음 ${s.smile}번`); if (s.wave) parts.push(`손짓 ${s.wave}번`); if (s.vocal) parts.push(`옹알이 ${s.vocal}번`); if (s.touch) parts.push(`터치 ${s.touch}번`); if (s.copy) parts.push(`따라 하기 ${s.copy}번`);
   $('endStats').textContent = parts.length ? `오늘 아기가 보낸 신호: ${parts.join(', ')}` : '';
   $('end').hidden = false; $('clock').textContent = ''; $('dbg').hidden = true;
   audio.chime([783.99, 659.25, 523.25], 0.18, 0.12);
@@ -627,7 +664,7 @@ $('go').addEventListener('click', async () => {
   if (first) playSeg(first); else enterWait(G.clips[0].id);
 });
 function closePlay() {
-  G.state = 'idle'; G.segToken++; clearInterval(G.tick); sensor.stop(); mv.pause();
+  G.state = 'idle'; G.segToken++; clearInterval(G.tick); sensor.stop(); mv.pause(); $('play').classList.remove('imitating');
   try { G.wake?.release(); } catch (e) {} G.wake = null;
   try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
   $('play').hidden = true; document.body.style.overflow = ''; renderHome();
@@ -648,9 +685,17 @@ lock.addEventListener('contextmenu', e => e.preventDefault());
 let lastTouch = 0;
 stageEl.addEventListener('pointerdown', e => {
   const now = performance.now(); if (now - lastTouch < 1500) return; lastTouch = now;
-  if (G.state === 'wait' || G.state === 'sleep') { G.stats.touch = (G.stats.touch || 0) + 1; onSense('touch'); }
+  if (G.state === 'wait' || G.state === 'sleep' || G.state === 'imitate') { G.stats.touch = (G.stats.touch || 0) + 1; onSense('touch'); }
 });
-$('dbg').addEventListener('click', e => { const b = e.target.closest('[data-ev]'); if (b) sensor.emit(b.dataset.ev, true); });
+$('dbg').addEventListener('click', e => {
+  const b = e.target.closest('[data-ev]'); if (!b) return;
+  if (b.dataset.ev === 'copy') {
+    if (G.state !== 'wait') return;
+    const pool = G.segs.filter(s => s.label === 'wave' || s.label === 'smile');
+    return void imitate(pickOne(pool.length ? pool : G.segs));
+  }
+  sensor.emit(b.dataset.ev, true);
+});
 document.addEventListener('keydown', e => {
   if (!settings.debug || $('play').hidden) return;
   const m = { 1: 'smile', 2: 'wave', 3: 'vocal', 4: 'look', 5: 'away' }[e.key]; if (m) sensor.emit(m, true);
